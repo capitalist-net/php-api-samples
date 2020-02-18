@@ -1,0 +1,22 @@
+{
+  "name": "capitalist-net/php-api-client",
+  "type": "library",
+  "description": "Capitalist.net PHP API client",
+  "keywords": [
+    "capitalist.net",
+    "api",
+    "capitalist"
+  ],
+  "homepage": "https://capitalist.net",
+  "license": "MIT",
+  "require": {
+    "php": ">=5.3.3",
+    "phpseclib/phpseclib": "~2.0"
+  },
+  "autoload": {
+    "files": [],
+    "psr-4": {
+      "capitalist\\": "capitalist/"
+    }
+  }
+}

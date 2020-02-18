@@ -1,0 +1,8 @@
+# Created by .ignore support plugin (hsz.mobi)
+
+vendor
+composer.lock
+composer.phar
+composer-setup.php
+samples/config/config-test.php
+
