@@ -17,7 +17,7 @@
  *
  */
 
-include_once('../config/config.php');
+include_once(__DIR__ . '/../config/config.php');
 
 $client = new \capitalist\api\Client($API_url);
 

@@ -18,7 +18,7 @@
  *
  */
 
-include_once('../config/config.php');
+include_once(__DIR__ . '/../config/config.php');
 
 /**
  * Смотрите Client.php для подробностей
