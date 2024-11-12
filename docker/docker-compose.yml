@@ -1,0 +1,33 @@
+version: '3.7'
+
+services:
+
+  php-cli-83:
+    build:
+      context: ./php-cli
+    tty: true
+    working_dir: /app
+    volumes:
+      - ../:/app
+    # connect to the network
+    # corresponds to the "--network" option
+    networks:
+      - capitalist
+    environment:
+      - TZ=${TIME_ZONE}
+      - DISPLAY_PHP_ERRORS
+      - GITHUB_API_TOKEN=${GITHUB_API_TOKEN}
+      - PHP_ENABLE_XDEBUG=${PHP_ENABLE_XDEBUG}
+      - SERVER_NAME=${XDEBUG_SERVER_NAME}
+      - XDEBUG_SESSION=phpstorm
+      - YII_DEBUG=true
+    extra_hosts:
+      "host.docker.internal": "host-gateway"
+
+networks:
+  capitalist:
+    name: capitalist
+    driver: bridge
+    driver_opts:
+     # mtu: 1300
+      "default-gateway": "gateway.docker.internal"

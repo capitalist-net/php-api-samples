@@ -2,6 +2,8 @@
 
 namespace capitalist\api;
 
+use phpseclib3\Crypt\RSA;
+
 /**
  * Смотрите актуальную документацию с примерами по адресу:
  * Read actual documentation at
@@ -36,10 +38,11 @@ class Client
     /**
      * @return string
      */
-    public function getToken()
+    public function getToken(): ?string
     {
         return $this->token;
     }
+
     const NOTIFICATION_LANG_RU = 'ru',
         NOTIFICATION_LANG_EN = 'en';
 
@@ -56,7 +59,7 @@ class Client
     /** @var string */
     protected $passwordKey = 'encrypted_password';
 
-	/** @var string */
+    /** @var string */
     private $token;
     /** @var int */
     private $lastErrorCode;
@@ -65,15 +68,16 @@ class Client
     /** @var string */
     private $lastResult;
 
-    /** @var string  */
+    /** @var string */
     private $apiAuthUser = '';
-    /** @var string  */
+    /** @var string */
     private $apiAuthPassword = '';
 
     /**
      * Формат ответов - csv, json, json-lite
      *
-     * @var string */
+     * @var string
+     */
     private $responseFormat = self::FORMAT_JSON;
 
     /**
@@ -99,41 +103,48 @@ class Client
     public function startSession($username, $password, $plainPassword = false)
     {
         $this->setUsername($username);
-        $this->plainPassword = (bool) $plainPassword;
+        $this->plainPassword = (bool)$plainPassword;
         $this->passwordKey = $this->plainPassword ? 'plain_password' : 'encrypted_password';
 
-		$this->setPassword(
+        $this->setPassword(
             $this->plainPassword
                 ? $password
                 : $this->encryptPassword($this->getSecurityAttributes(), $password)
         );
+
+        $this->log('Encrypted password: ' . $this->password);
     }
-	
-	/**
+
+    public function str2hex( $str ) {
+        $unpacked = unpack('H*', $str);
+        return array_shift( $unpacked );
+    }
+
+    /**
      * Шифрование пароля
      */
-    public function encryptPassword($attributes, $password)
+    public function encryptPassword($attributes, $password): ?string
     {
-        $encrypter = new Encrypter($attributes['modulus'], $attributes['exponent']);
-		return $encrypter->encrypt($password);
+        $key = RSA::loadPublicKey($attributes['rsa_public_key_pkcs1_pem'] ?? null);
+        $key = $key->withPadding(RSA::ENCRYPTION_PKCS1);
+        return $this->str2hex($key->encrypt($password));
     }
-		
+
     /**
-	 * Получение атрибутов шифрования и сессионного ключа (токена)
-	 *
+     * Получение атрибутов шифрования и сессионного ключа (токена)
+     *
      * Операция API: get_token
      *
      * @return array
      * @throws \Exception
      */
-    public function getSecurityAttributes()
+    public function getSecurityAttributes(): array
     {
         $params = $this->plainPassword ? [$this->passwordKey => $this->password] : [];
         if (!$this->sendPost($this::OPERATION_GET_TOKEN, $params))
             throw new \Exception(sprintf('Error: %s: %s', $this->getLastErrorCode(), $this->getLastErrorMessage()));
 
-        switch($this->getLastResponseFormat())
-        {
+        switch ($this->getLastResponseFormat()) {
             case self::FORMAT_JSON:
                 $response = $this->getJsonResult();
                 $result = $response['data'];
@@ -143,7 +154,8 @@ class Client
                 $result = array(
                     'token' => $response['data'][0][1],
                     'modulus' => $response['data'][0][2],
-                    'exponent' => $response['data'][0][3]
+                    'exponent' => $response['data'][0][3],
+                    'rsa_public_key_pkcs1_pem' => $response['data'][0][4] ?? null
                 );
                 break;
             default:
@@ -152,9 +164,10 @@ class Client
                 $result = array(
                     'token' => $response[0][1],
                     'modulus' => $response[0][2],
-                    'exponent' => $response[0][3]
+                    'exponent' => $response[0][3],
+                    'rsa_public_key_pkcs1_pem' => $response[0][4] ?? null
                 );
-            break;
+                break;
         }
 
         $this->token = $result['token'];
@@ -168,8 +181,8 @@ class Client
      * Операция API: password_recovery_generate_code
      *
      * @param string $identity Имя пользователя или e-mail
-     * @throws \Exception
      * @return bool
+     * @throws \Exception
      */
     public function sendPasswordRecoveryCode($identity)
     {
@@ -189,8 +202,8 @@ class Client
      *
      * @param string $login Имя пользователя
      * @param int $regCodeType Тип кода верификации
-     * @throws \Exception
      * @return bool
+     * @throws \Exception
      */
     public function sendEmailConfirmationCode($login, $regCodeType = self::EMAIL_CONFIRM_TYPE_ACTIVATION)
     {
@@ -202,7 +215,6 @@ class Client
 
         return $this->getLastResult();
     }
-
 
 
     /**
@@ -278,8 +290,7 @@ class Client
      */
     public function getLastResultAsArray()
     {
-        switch ($this->getLastResponseFormat())
-        {
+        switch ($this->getLastResponseFormat()) {
             case self::FORMAT_CSV:
                 return $this->getCsvResult();
                 break;
@@ -302,7 +313,7 @@ class Client
     public function getCsvResult()
     {
         $array = [];
-        foreach((array) explode("\n", $this->lastResult) as $line)
+        foreach ((array)explode("\n", $this->lastResult) as $line)
             $array[] = explode(';', $line);
         return $array;
     }
@@ -365,7 +376,7 @@ class Client
      * @return array
      * @throws \Exception
      */
-    public function pushBatchAdvanced($batchContent, $accountRUR, $accountEUR, $accountUSD, $accountBTC = null, $verificationType, $verificationData = null)
+    public function pushBatchAdvanced($batchContent, $accountRUR, $accountEUR, $accountUSD, $accountBTC = null, $verificationType = SELF::PIN_PASSWORD, $verificationData = null)
     {
         if ($verificationType == self::PIN_PASSWORD)
             $verificationData = md5($verificationData);
@@ -393,7 +404,7 @@ class Client
      * @return array
      * @throws \Exception
      */
-    public function addPaymentNotification($document, $channel = self::NOTIFICATION_CHANNEL_EMAIL, $address, $language = self::NOTIFICATION_LANG_RU)
+    public function addPaymentNotification($document, $channel, $address, $language = self::NOTIFICATION_LANG_RU): array
     {
         if (!$this->sendPost($this::OPERATION_ADD_NOTIFICATION, array(
             'encrypted_password' => $this->getPassword(),
@@ -505,8 +516,8 @@ class Client
      * @param string $email
      * @param string $nickname
      * @param bool|string $mobile (optional)
-     * @throws \Exception
      * @return string
+     * @throws \Exception
      */
     public function registerInvitee($username, $email, $nickname, $mobile = false)
     {
@@ -533,9 +544,9 @@ class Client
      * @param string $docState (optional)
      * @param int $limit (optional)
      * @param int $page (optional)
-     * @throws \Exception
      * @return string
      *
+     * @throws \Exception
      */
     public function getDocumentsHistory($periodBegin = null, $periodEnd = null, $docState = null, $limit = 30, $page = 1, $account = null, $searchRequisites = null)
     {
@@ -559,16 +570,16 @@ class Client
     /**
      * Операция API: get_documents_history (УСТАРЕВШЕЕ)
      *
-     * @see getDocumentsHistory()
-     *
      * @param string $account
      * @param string $from (optional)
      * @param string $to (optional)
      * @param string $docState (optional)
      * @param int $limit (optional)
      * @param int $page (optional)
-     * @throws \Exception
      * @return string
+     *
+     * @throws \Exception
+     * @see getDocumentsHistory()
      *
      * @deprecated
      */
@@ -601,9 +612,9 @@ class Client
      * @param string $docState (optional)
      * @param int $limit (optional)
      * @param int $page (optional)
+     * @return string
      * @throws \Exception
      * @internal param string $token
-     * @return string
      */
     public function getHistoryTest($account, $from = null, $to = null, $docState = null, $limit = 30, $page = 1)
     {
@@ -627,8 +638,8 @@ class Client
      * Операция API: registration_email_confirm
      *
      * @param string $codeFromEmail
-     * @throws \Exception
      * @return bool
+     * @throws \Exception
      */
     public function registrationEmailConfirm($codeFromEmail)
     {
@@ -640,8 +651,8 @@ class Client
 
         return $this->getLastResult();
     }
-	
-	/**
+
+    /**
      * Операция API: get_accounts
      *
      * @return string
@@ -665,8 +676,8 @@ class Client
      * Операция API: is_verified_account
      *
      * @param string $account Номер счета, например, R0978541
-     * @throws \Exception
      * @return bool
+     * @throws \Exception
      */
     public function isVerifiedUserByAccountNumber($account)
     {
@@ -682,7 +693,7 @@ class Client
 
     /**
      * Вызов операции с произвольными параметрами
-     * 
+     *
      * @param $operation
      * @param array $params
      * @param bool $guest
@@ -692,18 +703,18 @@ class Client
      */
     public function callOperation($operation, $params = [], $guest = false)
     {
-        
+
         $p = array_merge($guest ? [] : [
             $this->passwordKey => $this->password,
             'token' => $this->token
         ], $params);
-        
+
         if (!$this->sendPost($operation, $p))
             throw new \Exception(sprintf('Error: %s: %s', $this->getLastErrorCode(), $this->getLastErrorMessage()));
 
         return $this->getLastResult();
     }
-    
+
     /**
      * Операция API: create_account
      *
@@ -730,8 +741,8 @@ class Client
      *
      * @param string $docType
      * @param array $paymentDetails
-     * @throws \Exception
      * @return string
+     * @throws \Exception
      */
     public function getDocumentFee($docType, $paymentDetails)
     {
@@ -746,9 +757,9 @@ class Client
         return $this->getLastResult();
     }
 
-	/**
-	 * Service functions block
-	 */
+    /**
+     * Service functions block
+     */
 
     /**
      * Вызов API
@@ -756,10 +767,10 @@ class Client
      * @param string $operation
      * @param array $params
      * @param bool $anonymous
-     * @throws \Exception
      * @return mixed
+     * @throws \Exception
      */
-    protected function sendPost($operation, $params = array(), $anonymous = false)
+    protected function sendPost(string $operation, array $params = array(), bool $anonymous = false)
     {
         $data = array_merge(array('operation' => $operation), $params);
 
@@ -770,27 +781,26 @@ class Client
 
         $options = array(
             CURLOPT_RETURNTRANSFER => true,     // return web page
-            CURLOPT_HEADER         => true,     // return headers
+            CURLOPT_HEADER => true,     // return headers
             CURLOPT_FOLLOWLOCATION => true,     // follow redirects
-            CURLOPT_ENCODING       => "",       // handle all encodings
-            CURLOPT_USERAGENT      => "Client", // who am i
-            CURLOPT_AUTOREFERER    => true,     // set referer on redirect
+            CURLOPT_ENCODING => "",       // handle all encodings
+            CURLOPT_USERAGENT => "Client", // who am i
+            CURLOPT_AUTOREFERER => true,     // set referer on redirect
             CURLOPT_CONNECTTIMEOUT => 120,      // timeout on connect
-            CURLOPT_TIMEOUT        => 120,      // timeout on response
-            CURLOPT_MAXREDIRS      => 10,       // stop after 10 redirects
+            CURLOPT_TIMEOUT => 120,      // timeout on response
+            CURLOPT_MAXREDIRS => 10,       // stop after 10 redirects
             CURLOPT_SSL_VERIFYPEER => false     // Disabled SSL Cert checks
         );
-        curl_setopt_array( $ch, $options );
+        curl_setopt_array($ch, $options);
 
         curl_setopt($ch, CURLOPT_POST, true);
         curl_setopt($ch, CURLOPT_POSTFIELDS, http_build_query($data));
         if ($this->apiAuthUser)
-            curl_setopt($ch, CURLOPT_USERPWD, $this->apiAuthUser.($this->apiAuthPassword ? ':'.$this->apiAuthPassword: ''));
+            curl_setopt($ch, CURLOPT_USERPWD, $this->apiAuthUser . ($this->apiAuthPassword ? ':' . $this->apiAuthPassword : ''));
 
-        if ($this->getResponseFormat())
-        {
+        if ($this->getResponseFormat()) {
             curl_setopt($ch, CURLOPT_HTTPHEADER, array(
-                'x-response-format: '.$this->getResponseFormat()
+                'x-response-format: ' . $this->getResponseFormat()
             ));
         }
 
@@ -804,13 +814,12 @@ class Client
             throw new \Exception('No result found');
 
         // $this->log('Response headers: '. implode("\n\r", $this->getLastResponseHeaders()));
-        $this->log('Response body: '. $result);
+        $this->log('Response body: ' . $result);
 
         return $this->setLastResult($result)->validateResult($result);
     }
 
 
-	
     /**
      * Примитивная проверка, что ответ от сервера похож на заданный в заголовке.
      *
@@ -820,8 +829,7 @@ class Client
      */
     protected function validateResult($result)
     {
-        switch ($this->getLastResponseFormat())
-        {
+        switch ($this->getLastResponseFormat()) {
             default:
             case self::FORMAT_CSV:
                 return $this->validateCsvResult($result);
@@ -837,8 +845,7 @@ class Client
     {
         try {
             $array = json_decode($result, true);
-        } catch (Exception $e)
-        {
+        } catch (Exception $e) {
             throw new \Exception('Invalid response.');
         }
         if (!$array || !isset($array['code']) || !isset($array['message']) || !isset($array['data']))
@@ -900,7 +907,6 @@ class Client
     }
 
 
-
     /**
      * @return array
      */
@@ -926,8 +932,7 @@ class Client
     public function parseHttpHeaders($string)
     {
         $headers = [];
-        foreach ((array) explode("\r\n", $string) as $line)
-        {
+        foreach ((array)explode("\r\n", $string) as $line) {
             $kv = explode(': ', $line, 2);
 
             if (isset($kv[0]) && trim($kv[0]))

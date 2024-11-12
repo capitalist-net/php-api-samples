@@ -1,5 +1,6 @@
 {
   "name": "capitalist-net/php-api-samples",
+  "version": "2.8.0",
   "type": "library",
   "description": "Capitalist.net PHP API client",
   "keywords": [
@@ -10,8 +11,9 @@
   "homepage": "https://capitalist.net",
   "license": "MIT",
   "require": {
-    "php": ">=5.3.3",
-    "phpseclib/phpseclib": "~2.0"
+    "php": ">=8.3",
+    "phpseclib/phpseclib": "3.0.36.0",
+    "ext-curl": "*"
   },
   "autoload": {
     "files": [],
