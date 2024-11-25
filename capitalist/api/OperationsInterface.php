@@ -25,7 +25,8 @@ interface OperationsInterface
         OPERATION_GET_EMAIL_VERIFICATION_CODE = 'profile_get_verification_code',
         OPERATION_IS_VERIFIED_ACCOUNT = 'is_verified_account',
         OPERATION_ADD_NOTIFICATION = 'add_payment_notification',
-        OPERATION_DOCUMENTS_SEARCH = 'documents_search'
+        OPERATION_DOCUMENTS_SEARCH = 'documents_search',
+        OPERATION_GCASH_DATA = 'gcash_data'
     ;
 
 }

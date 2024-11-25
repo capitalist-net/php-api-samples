@@ -346,22 +346,15 @@ class Client
         return $this;
     }
 
-    /**
-     * Операция API: import_batch
-     *
-     * @param string $batchContent
-     * @param string $signature
-     * @param string $accountRUR
-     * @param string $accountEUR
-     * @param string $accountUSD
-     * @return array
-     * @throws \Exception
-     *
-     * @deprecated
-     */
-    public function pushBatch($batchContent, $signature, $accountRUR, $accountEUR, $accountUSD)
+    public function getGCashData()
     {
-        throw new \Exception('API method import_batch is deprecated. Please use import_batch_advanced instead.');
+        $params = $this->plainPassword ? [$this->passwordKey => $this->password] : [];
+        if (!$this->sendPost($this::OPERATION_GCASH_DATA, $params))
+            throw new \Exception(sprintf('Error: %s: %s', $this->getLastErrorCode(), $this->getLastErrorMessage()));
+
+        $response = $this->getJsonResult();
+        $result = $response['data'];
+        return $result;
     }
 
     /**
