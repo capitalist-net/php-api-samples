@@ -25,9 +25,9 @@ class Client
     implements VerificationTypesInterface, OperationsInterface
 {
 
-    const FORMAT_CSV = 'csv',                       // устаревший
-        FORMAT_JSON = 'json',                    // рекомендуемый
-        FORMAT_JSONLITE = 'json-lite';              // устаревший
+    const HEADER_X_RESPONSE_FORMAT = 'x-response-format';
+
+    const FORMAT_JSON = 'json'; // рекомендуемый
 
     const EMAIL_CONFIRM_TYPE_ACTIVATION = 1,
         EMAIL_CONFIRM_TYPE_CHANGE = 0;
@@ -46,12 +46,13 @@ class Client
     const NOTIFICATION_LANG_RU = 'ru',
         NOTIFICATION_LANG_EN = 'en';
 
-    private $_API_url = null;
+    protected $_API_url = null;
 
     /** @var string */
-    private $username;
+    protected $username;
+
     /** @var string */
-    private $password;
+    protected $password;
 
     /** @var bool */
     protected $plainPassword = false;
@@ -60,25 +61,25 @@ class Client
     protected $passwordKey = 'encrypted_password';
 
     /** @var string */
-    private $token;
+    protected $token;
     /** @var int */
-    private $lastErrorCode;
+    protected $lastErrorCode;
     /** @var string */
-    private $lastErrorMessage;
+    protected $lastErrorMessage;
     /** @var string */
-    private $lastResult;
+    protected $lastResult;
 
     /** @var string */
-    private $apiAuthUser = '';
+    protected $apiAuthUser = '';
     /** @var string */
-    private $apiAuthPassword = '';
+    protected $apiAuthPassword = '';
 
     /**
      * Формат ответов - csv, json, json-lite
      *
-     * @var string
+     * @var string|null
      */
-    private $responseFormat = self::FORMAT_JSON;
+    protected $responseFormat = self::FORMAT_JSON;
 
     /**
      * HTTP Заголовки крайнего ответа
@@ -89,7 +90,7 @@ class Client
 
     public $debugLog = false;
 
-    function __construct($APIurl)
+    function __construct(string $APIurl)
     {
         $this->_API_url = $APIurl;
         $p = parse_url($APIurl);
@@ -115,9 +116,10 @@ class Client
         $this->log('Encrypted password: ' . $this->password);
     }
 
-    public function str2hex( $str ) {
+    public function str2hex($str)
+    {
         $unpacked = unpack('H*', $str);
-        return array_shift( $unpacked );
+        return array_shift($unpacked);
     }
 
     /**
@@ -145,28 +147,10 @@ class Client
             throw new \Exception(sprintf('Error: %s: %s', $this->getLastErrorCode(), $this->getLastErrorMessage()));
 
         switch ($this->getLastResponseFormat()) {
+            default:
             case self::FORMAT_JSON:
                 $response = $this->getJsonResult();
                 $result = $response['data'];
-                break;
-            case self::FORMAT_JSONLITE:
-                $response = $this->getJsonResult();
-                $result = array(
-                    'token' => $response['data'][0][1],
-                    'modulus' => $response['data'][0][2],
-                    'exponent' => $response['data'][0][3],
-                    'rsa_public_key_pkcs1_pem' => $response['data'][0][4] ?? null
-                );
-                break;
-            default:
-            case self::FORMAT_CSV:
-                $response = $this->getCsvResult();
-                $result = array(
-                    'token' => $response[0][1],
-                    'modulus' => $response[0][2],
-                    'exponent' => $response[0][3],
-                    'rsa_public_key_pkcs1_pem' => $response[0][4] ?? null
-                );
                 break;
         }
 
@@ -175,52 +159,11 @@ class Client
         return $result;
     }
 
-    /**
-     * Отправка кода подтверждения для восстановления пароля
-     *
-     * Операция API: password_recovery_generate_code
-     *
-     * @param string $identity Имя пользователя или e-mail
-     * @return bool
-     * @throws \Exception
-     */
-    public function sendPasswordRecoveryCode($identity)
-    {
-        if (!$this->sendPost($this::OPERATION_PASSWORD_RECOVERY_GENERATE_CODE, array(
-            'identity' => $identity
-        ), true))
-            throw new \Exception(sprintf('Error: %s: %s', $this->getLastErrorCode(), $this->getLastErrorMessage()));
-
-        return $this->getLastResult();
-    }
-
-
-    /**
-     * Отправка кода подтверждения для смены имейла или активации аккаунта
-     *
-     * Операция API: profile_get_verification_code
-     *
-     * @param string $login Имя пользователя
-     * @param int $regCodeType Тип кода верификации
-     * @return bool
-     * @throws \Exception
-     */
-    public function sendEmailConfirmationCode($login, $regCodeType = self::EMAIL_CONFIRM_TYPE_ACTIVATION)
-    {
-        if (!$this->sendPost($this::OPERATION_GET_EMAIL_VERIFICATION_CODE, array(
-            'login' => $login,
-            'reg_code' => $regCodeType
-        ), true))
-            throw new \Exception(sprintf('Error: %s: %s', $this->getLastErrorCode(), $this->getLastErrorMessage()));
-
-        return $this->getLastResult();
-    }
-
 
     /**
      * @return string
      */
-    public function getUsername()
+    public function getUsername(): ?string
     {
         return $this->username;
     }
@@ -229,13 +172,13 @@ class Client
      * @param string $username
      * @return $this
      */
-    public function setUsername($username)
+    public function setUsername($username): self
     {
         $this->username = $username;
         return $this;
     }
 
-    public function hasError()
+    public function hasError(): bool
     {
         return $this->getLastErrorCode() != 0;
     }
@@ -243,15 +186,15 @@ class Client
     /**
      * @return int
      */
-    public function getLastErrorCode()
+    public function getLastErrorCode(): ?int
     {
-        return $this->lastErrorCode;
+        return ((int)$this->lastErrorCode) ?: 0;
     }
 
     /**
      * @return string
      */
-    public function getLastErrorMessage()
+    public function getLastErrorMessage(): ?string
     {
         return $this->lastErrorMessage;
     }
@@ -260,7 +203,7 @@ class Client
      * @param string $lastErrorMessage
      * @return $this
      */
-    public function setLastErrorMessage($lastErrorMessage)
+    public function setLastErrorMessage(string $lastErrorMessage): self
     {
         $this->lastErrorMessage = $lastErrorMessage;
         return $this;
@@ -277,7 +220,7 @@ class Client
     /**
      * @return mixed
      */
-    public function getJsonResult()
+    public function getJsonResult(): ?array
     {
         return json_decode($this->lastResult, true);
     }
@@ -288,21 +231,12 @@ class Client
      * @return array
      * @throws \Exception
      */
-    public function getLastResultAsArray()
+    public function getLastResultAsArray(): array
     {
         switch ($this->getLastResponseFormat()) {
-            case self::FORMAT_CSV:
-                return $this->getCsvResult();
-                break;
+            default:
             case self::FORMAT_JSON:
                 return $this->getJsonResult();
-                break;
-            case self::FORMAT_JSONLITE:
-                return $this->getJsonliteResult();
-                break;
-            default:
-                throw new \Exception('Unknown response format.');
-                break;
         }
     }
 
@@ -340,21 +274,10 @@ class Client
      * @param int $lastErrorCode
      * @return $this
      */
-    public function setLastErrorCode($lastErrorCode)
+    public function setLastErrorCode(int $lastErrorCode): self
     {
         $this->lastErrorCode = $lastErrorCode;
         return $this;
-    }
-
-    public function getGCashData()
-    {
-        $params = $this->plainPassword ? [$this->passwordKey => $this->password] : [];
-        if (!$this->sendPost($this::OPERATION_GCASH_DATA, $params))
-            throw new \Exception(sprintf('Error: %s: %s', $this->getLastErrorCode(), $this->getLastErrorMessage()));
-
-        $response = $this->getJsonResult();
-        $result = $response['data'];
-        return $result;
     }
 
     /**
@@ -392,29 +315,6 @@ class Client
     }
 
     /**
-     * Операция API: add_payment_notification
-     *
-     * @return array
-     * @throws \Exception
-     */
-    public function addPaymentNotification($document, $channel, $address, $language = self::NOTIFICATION_LANG_RU): array
-    {
-        if (!$this->sendPost($this::OPERATION_ADD_NOTIFICATION, array(
-            'encrypted_password' => $this->getPassword(),
-            $this->passwordKey => $this->password,
-            'token' => $this->token,
-            'document' => $document,
-            'channel' => $channel,
-            'address' => $address,
-            'language' => $language
-        ))
-        )
-            throw new \Exception(sprintf('Error: %s: %s', $this->getLastErrorCode(), $this->getLastErrorMessage()));
-
-        return $this->getLastResult();
-    }
-
-    /**
      * Операция API: process_batch
      *
      * @param string $batchId
@@ -438,19 +338,12 @@ class Client
         return $this->getLastResult();
     }
 
-    /**
-     * @return string
-     */
-    public function getPassword()
-    {
-        return $this->password;
-    }
 
     /**
      * @param string $password
      * @return $this
      */
-    public function setPassword($password)
+    public function setPassword($password): self
     {
         $this->password = $password;
         return $this;
@@ -459,10 +352,13 @@ class Client
     /**
      * Операция API: documents_search
      *
-     * @return array
+     * @param null|string $customNumber
+     * @param null|string $beginDate
+     * @param null|string $endDate
+     * @return array|null
      * @throws \Exception
      */
-    public function documentsSearch($customNumber = null, $beginDate = null, $endDate = null)
+    public function documentsSearch($customNumber = null, $beginDate = null, $endDate = null): ?array
     {
         if (!$this->sendPost($this::OPERATION_DOCUMENTS_SEARCH, array(
             $this->passwordKey => $this->password,
@@ -487,7 +383,7 @@ class Client
      * @return array
      * @throws \Exception
      */
-    public function getBatchRecords($batchId, $pageSize = 100, $offset = 0)
+    public function getBatchRecords($batchId, $pageSize = 100, $offset = 0): ?array
     {
         if (!$this->sendPost($this::OPERATION_GET_BATCH_INFO, array(
             $this->passwordKey => $this->password,
@@ -503,45 +399,22 @@ class Client
     }
 
     /**
-     * Операция API: register_invitee
-     *
-     * @param string $username
-     * @param string $email
-     * @param string $nickname
-     * @param bool|string $mobile (optional)
-     * @return string
-     * @throws \Exception
-     */
-    public function registerInvitee($username, $email, $nickname, $mobile = false)
-    {
-        if (!$this->sendPost($this::OPERATION_REGISTER_INVITEE, array(
-            $this->passwordKey => $this->password,
-            'token' => $this->token,
-            'invitee_login' => $username,
-            'invitee_email' => $email,
-            'invitee_nickname' => $nickname,
-            'invitee_mobile' => $mobile
-        ))
-        )
-            throw new \Exception(sprintf('Error: %s: %s', $this->getLastErrorCode(), $this->getLastErrorMessage()));
-
-        return $this->getLastResult();
-    }
-
-    /**
      * Операция API: get_documents_history_ext
      *
      * @param string $account
-     * @param string $from (optional)
-     * @param string $to (optional)
-     * @param string $docState (optional)
-     * @param int $limit (optional)
-     * @param int $page (optional)
+     * @param string|null $from (optional)
+     * @param string|null $to (optional)
+     * @param string|null $docState (optional)
+     * @param int|null $limit (optional)
+     * @param int|null $page (optional)
      * @return string
      *
      * @throws \Exception
      */
-    public function getDocumentsHistory($periodBegin = null, $periodEnd = null, $docState = null, $limit = 30, $page = 1, $account = null, $searchRequisites = null)
+    public function getDocumentsHistory(
+        $periodBegin = null, $periodEnd = null,
+        $docState = null, $limit = 30, $page = 1,
+        $account = null, $searchRequisites = null)
     {
         if (!$this->sendPost($this::OPERATION_GET_HISTORY_EXT, array(
             $this->passwordKey => $this->password,
@@ -560,41 +433,6 @@ class Client
         return $this->getLastResult();
     }
 
-    /**
-     * Операция API: get_documents_history (УСТАРЕВШЕЕ)
-     *
-     * @param string $account
-     * @param string $from (optional)
-     * @param string $to (optional)
-     * @param string $docState (optional)
-     * @param int $limit (optional)
-     * @param int $page (optional)
-     * @return string
-     *
-     * @throws \Exception
-     * @see getDocumentsHistory()
-     *
-     * @deprecated
-     */
-    public function getHistory($account, $from = null, $to = null, $docState = null, $limit = 30, $page = 1)
-    {
-        throw new \Exception('Please use get_documents_history_ext instead.');
-
-        if (!$this->sendPost($this::OPERATION_GET_HISTORY_DEPRECATED, array(
-            $this->passwordKey => $this->password,
-            'token' => $this->token,
-            'account' => $account,
-            'period_from' => $from,
-            'period_to' => $to,
-            'document_state' => $docState,
-            'limit' => $limit,
-            'page' => $page
-        ))
-        )
-            throw new \Exception(sprintf('Error: %s: %s', $this->getLastErrorCode(), $this->getLastErrorMessage()));
-
-        return $this->getLastResult();
-    }
 
     /**
      * Операция API: get_documents_history_test
@@ -648,10 +486,10 @@ class Client
     /**
      * Операция API: get_accounts
      *
-     * @return string
+     * @return array|null
      * @throws \Exception
      */
-    public function getUserAccounts()
+    public function getUserAccounts(): ?array
     {
         if (!$this->sendPost($this::OPERATION_GET_ACCOUNTS, array(
             $this->passwordKey => $this->password,
@@ -664,7 +502,7 @@ class Client
     }
 
     /**
-     * Проверка, верифицрован ли владелец счета
+     * Проверка, верифицирован ли владелец счета
      *
      * Операция API: is_verified_account
      *
@@ -672,7 +510,7 @@ class Client
      * @return bool
      * @throws \Exception
      */
-    public function isVerifiedUserByAccountNumber($account)
+    public function isVerifiedUserByAccountNumber($account): bool
     {
         if (!$this->sendPost($this::OPERATION_IS_VERIFIED_ACCOUNT, array(
             'account' => $account,
@@ -681,7 +519,7 @@ class Client
         )))
             throw new \Exception(sprintf('Error: %s: %s', $this->getLastErrorCode(), $this->getLastErrorMessage()));
 
-        return $this->getLastResult();
+        return (bool)$this->getLastResult();
     }
 
     /**
@@ -703,26 +541,6 @@ class Client
         ], $params);
 
         if (!$this->sendPost($operation, $p))
-            throw new \Exception(sprintf('Error: %s: %s', $this->getLastErrorCode(), $this->getLastErrorMessage()));
-
-        return $this->getLastResult();
-    }
-
-    /**
-     * Операция API: create_account
-     *
-     * @return string
-     * @throws \Exception
-     */
-    public function createAccount($currency, $title)
-    {
-        if (!$this->sendPost($this::OPERATION_CREATE_ACCOUNT, array(
-            $this->passwordKey => $this->password,
-            'token' => $this->token,
-            'account_name' => $title,
-            'account_currency' => $currency
-        ))
-        )
             throw new \Exception(sprintf('Error: %s: %s', $this->getLastErrorCode(), $this->getLastErrorMessage()));
 
         return $this->getLastResult();
@@ -791,16 +609,13 @@ class Client
         if ($this->apiAuthUser)
             curl_setopt($ch, CURLOPT_USERPWD, $this->apiAuthUser . ($this->apiAuthPassword ? ':' . $this->apiAuthPassword : ''));
 
-        if ($this->getResponseFormat()) {
-            curl_setopt($ch, CURLOPT_HTTPHEADER, array(
-                'x-response-format: ' . $this->getResponseFormat()
-            ));
-        }
+        curl_setopt($ch, CURLOPT_HTTPHEADER, array(
+            self::HEADER_X_RESPONSE_FORMAT . ': ' . ($this->getResponseFormat() ?: self::FORMAT_JSON),
+        ));
 
         $response = curl_exec($ch);
-
         $header_size = curl_getinfo($ch, CURLINFO_HEADER_SIZE);
-        $this->setLastResponseHeaders($this->parseHttpHeaders(substr($response, 0, $header_size)));
+        $this->setLastResponseHeaders($this->parseHeaders($response, $header_size));
         $result = substr($response, $header_size);
 
         if (!$result)
@@ -824,13 +639,8 @@ class Client
     {
         switch ($this->getLastResponseFormat()) {
             default:
-            case self::FORMAT_CSV:
-                return $this->validateCsvResult($result);
-                break;
             case self::FORMAT_JSON:
-            case self::FORMAT_JSONLITE:
                 return $this->validateJsonResult($result);
-                break;
         }
     }
 
@@ -843,8 +653,8 @@ class Client
         }
         if (!$array || !isset($array['code']) || !isset($array['message']) || !isset($array['data']))
             throw new \Exception('Invalid response.');
-        $this->setLastErrorCode($array['code']);
-        $this->setLastErrorMessage($array['message']);
+        $this->setLastErrorCode((int)$array['code']);
+        $this->setLastErrorMessage((string)$array['message']);
         return !$this->hasError();
     }
 
@@ -862,16 +672,16 @@ class Client
             throw new \Exception('Invalid response.');
         $firstline = explode(';', $lines[0]);
         $errorCode = $firstline[0];
-        $this->setLastErrorCode($errorCode);
+        $this->setLastErrorCode((int)$errorCode);
         if (!$errorCode) $this->setLastErrorMessage(false);
-        else $this->setLastErrorMessage(isset($firstline[1]) ? $firstline[1] : '');
+        else $this->setLastErrorMessage($firstline[1] ?? '');
         return !$this->hasError();
     }
 
     /**
      * @return string
      */
-    public function getResponseFormat()
+    public function getResponseFormat(): ?string
     {
         return $this->responseFormat;
     }
@@ -880,7 +690,7 @@ class Client
      * @param string $responseFormat
      * @return $this
      */
-    public function setResponseFormat($responseFormat)
+    public function setResponseFormat(string $responseFormat): self
     {
         $this->responseFormat = $responseFormat;
         return $this;
@@ -893,17 +703,17 @@ class Client
      *
      * @return string
      */
-    public function getLastResponseFormat()
+    public function getLastResponseFormat(): ?string
     {
         $headers = $this->getLastResponseHeaders();
-        return isset($headers['x-response-format']) ? $headers['x-response-format'] : null;
+        return $headers[self::HEADER_X_RESPONSE_FORMAT] ?? null;
     }
 
 
     /**
      * @return array
      */
-    public function getLastResponseHeaders()
+    public function getLastResponseHeaders(): ?array
     {
         return $this->lastResponseHeaders;
     }
@@ -912,29 +722,50 @@ class Client
      * @param array $lastResponseHeaders
      * @return $this
      */
-    public function setLastResponseHeaders($lastResponseHeaders)
+    public function setLastResponseHeaders(array $lastResponseHeaders): self
     {
         $this->lastResponseHeaders = $lastResponseHeaders;
         return $this;
     }
 
     /**
-     * @param $string
+     * @param $response
+     * @param $header_size
      * @return array
      */
-    public function parseHttpHeaders($string)
+    public function parseHeaders($response, $header_size): array
     {
-        $headers = [];
-        foreach ((array)explode("\r\n", $string) as $line) {
-            $kv = explode(': ', $line, 2);
+        // Extract the headers portion from the response
+        $headers_string = substr($response, 0, $header_size);
 
-            if (isset($kv[0]) && trim($kv[0]))
-                $headers[trim($kv[0])] = isset($kv[1]) ? $kv[1] : null;
+        // Initialize the headers array
+        $headers = [];
+
+        // Split the headers string into an array of lines
+        $header_lines = preg_split('/\r\n|\n|\r/', $headers_string);
+
+        // Process each header line
+        foreach ($header_lines as $header_line) {
+            // Skip empty lines and the HTTP status line
+            if (empty($header_line) || strpos($header_line, 'HTTP/') === 0) {
+                continue;
+            }
+
+            // Split each line into name and value
+            list($name, $value) = explode(':', $header_line, 2);
+
+            // Trim whitespace and convert header name to lowercase
+            $name = strtolower(trim($name));
+            $value = trim($value);
+
+            // Add to the headers array
+            $headers[$name] = $value;
         }
+
         return $headers;
     }
 
-    public function log($string)
+    public function log($string): void
     {
         if ($this->debugLog)
             printf("\n[%s] debug log: %s\n", date('d.m.Y H:i:s'), $string);
