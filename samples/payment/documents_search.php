@@ -23,7 +23,7 @@ $client = new \capitalist\api\Client($API_url);
 
 $client->startSession($username, $password);
 
-$documents = $client->documentsSearch('', '24.05.2025', '27.05.2025');
+$documents = $client->documentsSearch('518604', '25.03.2025', '27.03.2025');
 
 echo "\n\nDocumentsSearch: \n". $documents;
 

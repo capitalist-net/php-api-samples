@@ -296,31 +296,6 @@ class Client
     }
 
     /**
-     * Операция API: process_batch
-     *
-     * @param string $batchId
-     * @param string $verificationType
-     * @param string $verificationData
-     * @return array
-     * @throws \Exception
-     */
-    public function processBatch($batchId, $verificationType, $verificationData)
-    {
-        if (!$this->sendPost($this::OPERATION_PROCESS_BATCH, array(
-            $this->passwordKey => $this->password,
-            'token' => $this->token,
-            'batch_id' => $batchId,
-            'verification_type' => $verificationType,
-            'verification_data' => $verificationData
-        ))
-        )
-            throw new \Exception(sprintf('Error: %s: %s', $this->getLastErrorCode(), $this->getLastErrorMessage()));
-
-        return $this->getLastResult();
-    }
-
-
-    /**
      * @param string $password
      * @return $this
      */
