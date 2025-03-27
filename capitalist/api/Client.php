@@ -242,25 +242,6 @@ class Client
 
 
     /**
-     * @return array
-     */
-    public function getCsvResult()
-    {
-        $array = [];
-        foreach ((array)explode("\n", $this->lastResult) as $line)
-            $array[] = explode(';', $line);
-        return $array;
-    }
-
-    /**
-     * @return mixed
-     */
-    public function getJsonliteResult()
-    {
-        return json_decode($this->lastResult, true);
-    }
-
-    /**
      * @param string $lastResult
      * @return $this
      */
@@ -292,7 +273,7 @@ class Client
      * @return array
      * @throws \Exception
      */
-    public function pushBatchAdvanced($batchContent, $accountRUR, $accountEUR, $accountUSD, $accountBTC = null, $verificationType = SELF::PIN_PASSWORD, $verificationData = null)
+    public function pushBatchAdvanced($batchContent, $accountRUR, $accountEUR, $accountUSD, $accountBTC = null, string $verificationType = self::PIN_PASSWORD, string $verificationData = null)
     {
         if ($verificationType == self::PIN_PASSWORD)
             $verificationData = md5($verificationData);
@@ -358,7 +339,7 @@ class Client
      * @return array|null
      * @throws \Exception
      */
-    public function documentsSearch($customNumber = null, $beginDate = null, $endDate = null): ?array
+    public function documentsSearch($customNumber = null, $beginDate = null, $endDate = null)
     {
         if (!$this->sendPost($this::OPERATION_DOCUMENTS_SEARCH, array(
             $this->passwordKey => $this->password,
@@ -383,7 +364,7 @@ class Client
      * @return array
      * @throws \Exception
      */
-    public function getBatchRecords($batchId, $pageSize = 100, $offset = 0): ?array
+    public function getBatchRecords($batchId, $pageSize = 100, $offset = 0)
     {
         if (!$this->sendPost($this::OPERATION_GET_BATCH_INFO, array(
             $this->passwordKey => $this->password,
@@ -489,7 +470,7 @@ class Client
      * @return array|null
      * @throws \Exception
      */
-    public function getUserAccounts(): ?array
+    public function getUserAccounts()
     {
         if (!$this->sendPost($this::OPERATION_GET_ACCOUNTS, array(
             $this->passwordKey => $this->password,
@@ -648,7 +629,7 @@ class Client
     {
         try {
             $array = json_decode($result, true);
-        } catch (Exception $e) {
+        } catch (\Exception $e) {
             throw new \Exception('Invalid response.');
         }
         if (!$array || !isset($array['code']) || !isset($array['message']) || !isset($array['data']))
@@ -668,7 +649,7 @@ class Client
     protected function validateCsvResult($result)
     {
         $lines = explode("\n", $result);
-        if (!preg_match('/^\d+\;.+$/', $lines[0]))
+        if (!preg_match('/^\d+;.+$/', $lines[0]))
             throw new \Exception('Invalid response.');
         $firstline = explode(';', $lines[0]);
         $errorCode = $firstline[0];
