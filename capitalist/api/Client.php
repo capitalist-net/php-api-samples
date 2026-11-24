@@ -273,10 +273,18 @@ class Client
      * @return array
      * @throws \Exception
      */
-    public function pushBatchAdvanced($batchContent, $accountRUR, $accountEUR, $accountUSD, $accountBTC = null, string $verificationType = self::PIN_PASSWORD, string $verificationData = null)
-    {
-        if ($verificationType == self::PIN_PASSWORD)
-            $verificationData = md5($verificationData);
+    public function pushBatchAdvanced(
+        $batchContent,
+        $accountRUR,
+        $accountEUR,
+        $accountUSD,
+        $accountBTC = null,
+        string $verificationType = self::PIN_PASSWORD,
+        ?string $verificationData = null
+    ) {
+        if ($verificationType == self::PIN_PASSWORD) {
+            $verificationData = md5($verificationData ?? '');
+        }
 
         if (!$this->sendPost($this::OPERATION_IMPORT_BATCH_ADV, array(
             $this->passwordKey => $this->password,
